@@ -4,12 +4,19 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+const GRAY: u32 = 0xaa_aa_aa;
+// const RED: u32 = 0xff_00_00;
+// const YELLOW: u32 = 0xff_00_ff;
+// const BLUE: u32 = 0x00_00_ff;
+const GREEN: u32 = 0x00_ff_00;
+// const CYAN: u32 = 0x00_ff_ff;
+
 struct Colored(u32, u8);
 
 impl Display for Colored {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let Self(a, b) = self;
-        write!(f, "<fc=#{:02x}>{:02x}</fc>", a, b)
+        write!(f, "<fc=#{:06x}>{:02x}</fc>", a, b)
     }
 }
 
@@ -17,10 +24,10 @@ fn print_hextime(x: u64) {
     let [a, b, c, d, ..] = x.to_le_bytes();
     println!(
         "{} {} {} {}",
-        Colored(0xaaaaaa, d),
-        Colored(0xaaaaaa, c),
-        Colored(0xff0000, b),
-        Colored(0xff0000, a),
+        Colored(GRAY, d),
+        Colored(GRAY, c),
+        Colored(GREEN, b),
+        Colored(GRAY, a),
     );
     sleep(Duration::from_secs(1));
 }
