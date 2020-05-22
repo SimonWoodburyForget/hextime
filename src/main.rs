@@ -1,6 +1,8 @@
-use std::fmt::{self, Display, Formatter};
-use std::thread::sleep;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{
+    fmt::{self, Display, Formatter},
+    thread::sleep,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 struct Colored(u32, u8);
 
