@@ -9,7 +9,7 @@ struct Colored(u32, u8);
 impl Display for Colored {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let Self(a, b) = self;
-        write!(f, "<fc=#{:0x}>{:0x}</fc>", a, b)
+        write!(f, "<fc=#{:02x}>{:02x}</fc>", a, b)
     }
 }
 
