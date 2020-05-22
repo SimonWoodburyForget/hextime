@@ -21,7 +21,7 @@ impl Display for Colored {
 }
 
 fn print_hextime(x: u64) {
-    let [a, b, c, d, ..] = x.to_le_bytes();
+    let [.., d, c, b, a] = x.to_be_bytes();
     println!(
         "{} {} {} {}",
         Colored(GRAY, d),
