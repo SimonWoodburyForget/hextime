@@ -1,9 +1,24 @@
-use std::{thread::sleep, time::Duration};
-use time::{OffsetDateTime, PrimitiveDateTime, Time, UtcOffset};
+use formatting::*;
+use std::{
+    convert::TryInto,
+    io::{self, Write},
+    thread::sleep,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
-mod display_impl {
-    use super::{Color, Fc, Hex2};
+mod formatting {
     use std::fmt::{self, Display, Formatter};
+
+    #[derive(Clone, Copy)]
+    pub enum Color {
+        Gray,
+        LightGray,
+        Red,
+        Yellow,
+        Blue,
+        Green,
+        Cyan,
+    }
 
     impl From<Color> for u32 {
         fn from(other: Color) -> u32 {
@@ -27,44 +42,51 @@ mod display_impl {
         }
     }
 
-    impl<A: Display, B: Display> Display for Fc<A, B> {
+    pub struct Fc<T>(pub Color, pub T);
+    impl<T: Display> Display for Fc<T> {
         fn fmt(&self, f: &mut Formatter) -> fmt::Result {
             let Self(a, b) = self;
             write!(f, "<fc=#{}>{}</fc>", a, b)
         }
     }
 
+    pub struct Hex2<T>(pub T);
     impl<T: Display + fmt::UpperHex> Display for Hex2<T> {
         fn fmt(&self, f: &mut Formatter) -> fmt::Result {
             write!(f, "{:02X}", self.0)
         }
     }
-}
 
-#[derive(Clone, Copy)]
-enum Color {
-    Gray,
-    LightGray,
-    Red,
-    Yellow,
-    Blue,
-    Green,
-    Cyan,
-}
-
-struct Fc<A, B>(A, B);
-struct Hex2<T>(T);
-
-fn print_full(x: u32) {
-    match x.to_be_bytes() {
-        [d, c, b, a] => print!(
-            "{} {} {} {}",
-            Fc(Color::Gray, Hex2(d)),
-            Fc(Color::Gray, Hex2(c)),
-            Fc(Color::Green, Hex2(b)),
-            Fc(Color::LightGray, Hex2(a)),
-        ),
+    pub struct XmobarFmt<T>(pub T);
+    impl Display for XmobarFmt<u32> {
+        fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+            let [d, c, b, a] = self.0.to_be_bytes();
+            write!(
+                f,
+                "{} {} {} {}",
+                Fc(Color::Gray, Hex2(d)),
+                Fc(Color::Gray, Hex2(c)),
+                Fc(Color::Green, Hex2(b)),
+                Fc(Color::LightGray, Hex2(a)),
+            )
+        }
     }
+
+    pub struct TermFmt<T>(pub T);
+    impl Display for TermFmt<u32> {
+        fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+            let [d, c, b, a] = self.0.to_be_bytes();
+            write!(f, "{} {} {} {}", Hex2(d), Hex2(c), Hex2(b), Hex2(a))
+        }
+    }
+}
+
+fn print_xbar(x: u32) {
+    print!("{}", XmobarFmt(x));
+}
+
+fn print_term(x: u32) {
+    print!("{}", TermFmt(x));
 }
 
 fn print_two(x: u32) {
@@ -72,16 +94,19 @@ fn print_two(x: u32) {
     print!("{} {}", Fc(Color::Cyan, b), Fc(Color::LightGray, a),);
 }
 
+/// Returns an iterator of distinct 32-bit seconds.
+fn seconds() -> impl Iterator<Item = u32> {
+    std::iter::repeat_with(SystemTime::now)
+        .map(|time| time.duration_since(UNIX_EPOCH))
+        .filter_map(|result| result.map(|x| x.as_secs()).ok())
+        .map(|secs| secs.try_into().expect("Time overflowed."))
+}
+
 fn main() {
-    std::iter::repeat_with(OffsetDateTime::now_local).for_each(|now| {
-        print_full(now.timestamp() as u32);
-        print!(" - ");
-        print_two(
-            PrimitiveDateTime::new(now.date().next_day(), Time::midnight())
-                .assume_offset(UtcOffset::current_local_offset())
-                .timestamp() as u32,
-        );
-        println!();
+    seconds().for_each(|now| {
+        print_xbar(now);
+        io::stdout().flush().unwrap();
+        print!("\r");
         sleep(Duration::from_secs(1));
     });
 }
