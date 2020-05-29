@@ -22,7 +22,7 @@ mod formatting {
     }
 
     impl From<Color> for u32 {
-        fn from(other: Color) -> u32 {
+        fn from(other: Color) -> Self {
             use Color::*;
             match other {
                 Gray => 0x99_99_99,
@@ -51,6 +51,7 @@ mod formatting {
         }
     }
 
+    #[derive(Clone)]
     pub struct Hex2<T>(pub T);
     impl<T: Display + fmt::UpperHex> Display for Hex2<T> {
         fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -89,6 +90,27 @@ fn print_term(x: u32) {
     print!("{}", TermFmt(x));
 }
 
+fn print_term_color(x: u32) {
+    use crossterm::{
+        execute,
+        style::{Color::*, Print, ResetColor, SetForegroundColor},
+    };
+    use std::io::stdout;
+    x.to_be_bytes()
+        .iter()
+        .zip([DarkGrey, DarkGrey, Green, White].iter())
+        .try_for_each(|(&x, &c)| {
+            execute!(
+                stdout(),
+                SetForegroundColor(c),
+                Print(formatting::Hex2(x)),
+                Print(" "),
+                ResetColor
+            )
+        })
+        .unwrap();
+}
+
 /// Returns an iterator of distinct 32-bit seconds.
 fn seconds() -> impl Iterator<Item = u32> {
     std::iter::repeat_with(SystemTime::now)
@@ -99,17 +121,17 @@ fn seconds() -> impl Iterator<Item = u32> {
 
 mod cli {
     use structopt::StructOpt;
-    use termcolor::*;
 
     #[derive(Debug, Clone, Copy)]
     pub enum Mode {
         Xmobar,
         Terminal,
+        ColorTerm,
     }
 
     impl Mode {
-        const STRS: [&'static str; 2] = ["xmobar", "terminal"];
-        const MODE: [Mode; 2] = [Mode::Xmobar, Mode::Terminal];
+        const STRS: [&'static str; 3] = ["xmobar", "terminal", "cterm"];
+        const MODE: [Mode; 3] = [Mode::Xmobar, Mode::Terminal, Mode::ColorTerm];
     }
 
     impl std::str::FromStr for Mode {
@@ -137,6 +159,7 @@ fn main() {
         match Opt::from_args() {
             Opt { mode: Xmobar } => print_xbar,
             Opt { mode: Terminal } => print_term,
+            Opt { mode: ColorTerm } => print_term_color,
         }
     };
 

@@ -9,4 +9,4 @@ license = "MIT"
 
 [dependencies]
 structopt = "0.3"
-termcolor = "1.1"
+crossterm = "0.17.5"
