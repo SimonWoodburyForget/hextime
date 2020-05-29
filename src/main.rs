@@ -96,7 +96,7 @@ impl HexTime {
     fn segmented(self) -> impl Iterator<Item = (Segment, u8)> {
         self.bytes()
             .enumerate()
-            .map(move |(a, b)| (Segment::new(self.0.to_be_bytes().len() - a), b))
+            .map(move |(a, b)| (Segment::new(self.0.to_be_bytes().len() - 1 - a), b))
     }
 }
 
@@ -119,8 +119,8 @@ impl From<Segment> for crossterm::style::Color {
     fn from(seg: Segment) -> Self {
         use crossterm::style::Color::*;
         match seg.0 {
-            1 => White,
-            2 => Green,
+            0 => White,
+            1 => Green,
             _ => DarkGrey,
         }
     }
