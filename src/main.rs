@@ -82,6 +82,50 @@ mod formatting {
     }
 }
 
+#[derive(Clone, Copy)]
+struct HexTime(u32);
+
+impl HexTime {
+    /// Iterator over increasing bytes of time value.
+    fn bytes(self) -> impl Iterator<Item = u8> {
+        let bytes = self.0.to_be_bytes();
+        (0..bytes.len()).map(move |idx| bytes[idx])
+    }
+
+    /// Iterator over increasing bytes of time value, with an offset from zero segment.
+    fn segmented(self) -> impl Iterator<Item = (Segment, u8)> {
+        self.bytes()
+            .enumerate()
+            .map(move |(a, b)| (Segment::new(self.0.to_be_bytes().len() - a), b))
+    }
+}
+
+/// Segment of HexTime.
+#[derive(Clone, Copy)]
+struct Segment(usize);
+
+impl Segment {
+    /// Return offset segment of HexTime. *Value must be smaller then 8.*
+    fn new(x: usize) -> Self {
+        if x < 8 {
+            Self(x)
+        } else {
+            panic!("Time segment is too large.")
+        }
+    }
+}
+
+impl From<Segment> for crossterm::style::Color {
+    fn from(seg: Segment) -> Self {
+        use crossterm::style::Color::*;
+        match seg.0 {
+            1 => White,
+            2 => Green,
+            _ => DarkGrey,
+        }
+    }
+}
+
 fn print_xbar(x: u32) {
     print!("{}", XmobarFmt(x));
 }
@@ -92,20 +136,20 @@ fn print_term(x: u32) {
 
 fn print_term_color(x: u32) {
     use crossterm::{
-        execute,
-        style::{Color::*, Print, ResetColor, SetForegroundColor},
+        cursor, execute,
+        style::{Print, ResetColor, SetForegroundColor},
     };
     use std::io::stdout;
-    x.to_be_bytes()
-        .iter()
-        .zip([DarkGrey, DarkGrey, Green, White].iter())
-        .try_for_each(|(&x, &c)| {
+    HexTime(x)
+        .segmented()
+        .try_for_each(|(s, x)| {
             execute!(
                 stdout(),
-                SetForegroundColor(c),
+                SetForegroundColor(s.into()),
                 Print(formatting::Hex2(x)),
                 Print(" "),
-                ResetColor
+                ResetColor,
+                cursor::Hide
             )
         })
         .unwrap();
