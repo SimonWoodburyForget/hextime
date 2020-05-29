@@ -61,23 +61,22 @@ mod formatting {
     pub struct XmobarFmt<T>(pub T);
     impl Display for XmobarFmt<u32> {
         fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-            let [d, c, b, a] = self.0.to_be_bytes();
-            write!(
-                f,
-                "{} {} {} {}",
-                Fc(Color::Gray, Hex2(d)),
-                Fc(Color::Gray, Hex2(c)),
-                Fc(Color::Green, Hex2(b)),
-                Fc(Color::LightGray, Hex2(a)),
-            )
+            use Color::*;
+            self.0
+                .to_be_bytes()
+                .iter()
+                .zip([Gray, Gray, Green, LightGray].iter())
+                .try_for_each(|(&x, &c)| write!(f, "{} ", Fc(c, Hex2(x))))
         }
     }
 
     pub struct TermFmt<T>(pub T);
     impl Display for TermFmt<u32> {
         fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-            let [d, c, b, a] = self.0.to_be_bytes();
-            write!(f, "{} {} {} {}", Hex2(d), Hex2(c), Hex2(b), Hex2(a))
+            self.0
+                .to_be_bytes()
+                .iter()
+                .try_for_each(|&x| write!(f, "{} ", Hex2(x)))
         }
     }
 }
@@ -98,38 +97,43 @@ fn seconds() -> impl Iterator<Item = u32> {
         .map(|secs| secs.try_into().expect("Time overflowed."))
 }
 
-#[derive(Debug, Clone, Copy)]
-enum Mode {
-    Xmobar,
-    Terminal,
-}
+mod cli {
+    use structopt::StructOpt;
+    use termcolor::*;
 
-impl Mode {
-    const STRS: [&'static str; 2] = ["xmobar", "terminal"];
-    const MODE: [Mode; 2] = [Mode::Xmobar, Mode::Terminal];
-}
-
-impl std::str::FromStr for Mode {
-    type Err = &'static str;
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
-        Mode::STRS
-            .iter()
-            .zip(Mode::MODE.iter())
-            .find_map(|(&x, &m)| if x == input { Some(m) } else { None })
-            .ok_or("no match")
+    #[derive(Debug, Clone, Copy)]
+    pub enum Mode {
+        Xmobar,
+        Terminal,
     }
-}
 
-#[derive(StructOpt, Debug)]
-struct Opt {
-    /// Printing mode.
-    #[structopt(short, long, possible_values = &Mode::STRS)]
-    mode: Mode,
+    impl Mode {
+        const STRS: [&'static str; 2] = ["xmobar", "terminal"];
+        const MODE: [Mode; 2] = [Mode::Xmobar, Mode::Terminal];
+    }
+
+    impl std::str::FromStr for Mode {
+        type Err = &'static str;
+        fn from_str(input: &str) -> Result<Self, Self::Err> {
+            Mode::STRS
+                .iter()
+                .zip(Mode::MODE.iter())
+                .find_map(|(&x, &m)| if x == input { Some(m) } else { None })
+                .ok_or("no match")
+        }
+    }
+
+    #[derive(StructOpt, Debug)]
+    pub struct Opt {
+        /// Printing mode.
+        #[structopt(short, long, possible_values = &Mode::STRS)]
+        pub mode: Mode,
+    }
 }
 
 fn main() {
     let print = {
-        use Mode::*;
+        use cli::{Mode::*, Opt};
         match Opt::from_args() {
             Opt { mode: Xmobar } => print_xbar,
             Opt { mode: Terminal } => print_term,
