@@ -5,6 +5,7 @@ use std::{
     thread::sleep,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+use structopt::StructOpt;
 
 mod formatting {
     use std::fmt::{self, Display, Formatter};
@@ -89,11 +90,6 @@ fn print_term(x: u32) {
     print!("{}", TermFmt(x));
 }
 
-fn print_two(x: u32) {
-    let [.., b, a] = x.to_be_bytes();
-    print!("{} {}", Fc(Color::Cyan, b), Fc(Color::LightGray, a),);
-}
-
 /// Returns an iterator of distinct 32-bit seconds.
 fn seconds() -> impl Iterator<Item = u32> {
     std::iter::repeat_with(SystemTime::now)
@@ -102,9 +98,46 @@ fn seconds() -> impl Iterator<Item = u32> {
         .map(|secs| secs.try_into().expect("Time overflowed."))
 }
 
+#[derive(Debug, Clone, Copy)]
+enum Mode {
+    Xmobar,
+    Terminal,
+}
+
+impl Mode {
+    const STRS: [&'static str; 2] = ["xmobar", "terminal"];
+    const MODE: [Mode; 2] = [Mode::Xmobar, Mode::Terminal];
+}
+
+impl std::str::FromStr for Mode {
+    type Err = &'static str;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        Mode::STRS
+            .iter()
+            .zip(Mode::MODE.iter())
+            .find_map(|(&x, &m)| if x == input { Some(m) } else { None })
+            .ok_or("no match")
+    }
+}
+
+#[derive(StructOpt, Debug)]
+struct Opt {
+    /// Printing mode.
+    #[structopt(short, long, possible_values = &Mode::STRS)]
+    mode: Mode,
+}
+
 fn main() {
+    let print = {
+        use Mode::*;
+        match Opt::from_args() {
+            Opt { mode: Xmobar } => print_xbar,
+            Opt { mode: Terminal } => print_term,
+        }
+    };
+
     seconds().for_each(|now| {
-        print_xbar(now);
+        print(now);
         io::stdout().flush().unwrap();
         print!("\r");
         sleep(Duration::from_secs(1));
