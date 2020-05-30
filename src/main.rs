@@ -42,7 +42,6 @@ mod cli {
 }
 
 mod formatting {
-    use super::HexTime;
     use std::fmt::{self, Display, Formatter};
 
     #[derive(Clone, Copy)]
@@ -93,25 +92,6 @@ mod formatting {
             write!(f, "{:02X}", self.0)
         }
     }
-
-    pub struct XmobarFmt<T>(pub T);
-    impl Display for XmobarFmt<u32> {
-        fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-            HexTime(self.0)
-                .segmented()
-                .map(|(s, x)| Fc(Color::from(s), Hex2(x)))
-                .try_for_each(|x| write!(f, "{} ", x))
-        }
-    }
-
-    pub struct TermFmt<T>(pub T);
-    impl Display for TermFmt<u32> {
-        fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-            HexTime(self.0)
-                .bytes()
-                .try_for_each(|x| write!(f, "{} ", Hex2(x)))
-        }
-    }
 }
 
 mod seg {
@@ -127,6 +107,11 @@ mod seg {
             } else {
                 panic!("Time segment is too large.")
             }
+        }
+
+        /// Returns whether the internal segment equals `x`.
+        pub fn contains(&self, x: u8) -> bool {
+            self.0 == x as usize
         }
     }
 
@@ -157,6 +142,10 @@ mod seg {
 struct HexTime(u32);
 
 impl HexTime {
+    fn new(x: u32) -> Self {
+        Self(x)
+    }
+
     /// Iterator over increasing bytes of time value.
     fn bytes(self) -> impl Iterator<Item = u8> {
         let bytes = self.0.to_be_bytes();
@@ -172,27 +161,39 @@ impl HexTime {
 }
 
 fn print_xbar(x: u32) {
-    print!("{}", XmobarFmt(x));
+    use formatting::*;
+    HexTime(x).segmented().for_each(|(s, x)| {
+        print!("{}", Fc(Color::from(s), Hex2(x)));
+        if !s.contains(0) {
+            print!(" ");
+        }
+    })
 }
 
 fn print_term(x: u32) {
-    print!("{}", TermFmt(x));
+    use formatting::*;
+    HexTime::new(x).segmented().for_each(|(s, x)| {
+        print!("{}", Hex2(x));
+        if !s.contains(0) {
+            print!(" ");
+        }
+    })
 }
 
 fn print_term_color(x: u32) {
     use crossterm::{
-        cursor, execute,
+        cursor, queue,
         style::{Print, ResetColor, SetForegroundColor},
     };
     use std::io::stdout;
     HexTime(x)
         .segmented()
         .try_for_each(|(s, x)| {
-            execute!(
+            queue!(
                 stdout(),
                 SetForegroundColor(s.into()),
                 Print(formatting::Hex2(x)),
-                Print(" "),
+                if s.contains(0) { Print("") } else { Print(" ") },
                 ResetColor,
                 cursor::Hide
             )
